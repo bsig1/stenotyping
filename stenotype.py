@@ -125,6 +125,8 @@ class PloverPracticeApp(ttk.Frame):
         super().__init__(master)
         self.master = master
 
+        self.set_app_icon(self.master)
+
         # Data
         self.word_bank_path: str | None = None
         self.dict_path: str | None = None
@@ -167,6 +169,15 @@ class PloverPracticeApp(ttk.Frame):
     # -------------------------
     # Styling / Layout
     # -------------------------
+
+    def set_app_icon(self, root, path="icon.png"):
+        try:
+            from PIL import Image, ImageTk
+            icon = ImageTk.PhotoImage(Image.open(path))
+            root.iconphoto(True, icon)
+            root._icon_ref = icon  # prevent GC
+        except Exception as e:
+            print("Icon load failed:", e)
 
     def _style(self):
         style = ttk.Style(self.master)
@@ -218,43 +229,38 @@ class PloverPracticeApp(ttk.Frame):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
 
-        # Top bar
+        # ── Top bar ──────────────────────────────────────────────
         top = ttk.Frame(self, style="TFrame")
         top.grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 8))
         top.columnconfigure(1, weight=1)
 
-        title = ttk.Label(top, text="Plover Practice", style="Big.TLabel")
-        title.grid(row=0, column=0, sticky="w")
+        ttk.Label(top, text="Plover Practice", style="Big.TLabel").grid(
+            row=0, column=0, sticky="w"
+        )
 
         buttons = ttk.Frame(top)
         buttons.grid(row=0, column=1, sticky="e")
 
-        self.btn_load_bank = ttk.Button(buttons, text="Load Word Bank", command=self.on_load_word_bank)
-        self.btn_load_bank.grid(row=0, column=0, padx=(0, 8))
+        ttk.Button(buttons, text="Load Word Bank", command=self.on_load_word_bank).grid(row=0, column=0, padx=(0, 8))
+        ttk.Button(buttons, text="Load Dictionary JSON", command=self.on_load_dict).grid(row=0, column=1, padx=(0, 8))
+        ttk.Button(buttons, text="Next", command=self.on_next_word).grid(row=0, column=2, padx=(0, 8))
+        ttk.Button(buttons, text="Reset Session", command=self._reset_session).grid(row=0, column=3)
 
-        self.btn_load_dict = ttk.Button(buttons, text="Load Dictionary JSON", command=self.on_load_dict)
-        self.btn_load_dict.grid(row=0, column=1, padx=(0, 8))
-
-        self.btn_next = ttk.Button(buttons, text="Next", command=self.on_next_word)
-        self.btn_next.grid(row=0, column=2, padx=(0, 8))
-
-        self.btn_reset = ttk.Button(buttons, text="Reset Session", command=self._reset_session)
-        self.btn_reset.grid(row=0, column=3)
-
-        # Main split
+        # ── Main split ───────────────────────────────────────────
         main = ttk.Frame(self)
         main.grid(row=1, column=0, sticky="nsew", padx=16, pady=(8, 16))
         main.columnconfigure(0, weight=3)
         main.columnconfigure(1, weight=2)
         main.rowconfigure(0, weight=1)
 
-        # Practice pane
+        # ── Left pane (practice) ─────────────────────────────────
         left = ttk.Frame(main)
         left.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
         left.columnconfigure(0, weight=1)
-        left.rowconfigure(1, weight=0)
 
-        # --- Source text block (quote mode) ---
+        # spacer row (THIS pushes entry to bottom)
+        left.rowconfigure(5, weight=1)
+
         ttk.Label(left, text="Source Text (one quote/line)", style="Muted.TLabel").grid(row=0, column=0, sticky="w")
 
         self.txt_source = tk.Text(
@@ -277,16 +283,21 @@ class PloverPracticeApp(ttk.Frame):
         ttk.Button(mode_bar, text="Restart Quote", command=self.restart_quote).grid(row=0, column=1, padx=(0, 8))
         ttk.Button(mode_bar, text="Use Word Bank (Random)", command=self.use_bank_random).grid(row=0, column=2)
 
-        # --- Current prompt ---
         self.lbl_word = ttk.Label(left, text="—", style="Word.TLabel")
         self.lbl_word.grid(row=3, column=0, sticky="w", pady=(0, 6))
 
-        self.lbl_hint = ttk.Label(left, text="Load a word bank to begin.", style="Hint.TLabel")
-        self.lbl_hint.grid(row=4, column=0, sticky="w", pady=(0, 12))
+        self.lbl_hint = ttk.Label(
+            left,
+            text="Load a word bank to begin.",
+            wraplength=350,
+            justify="left",
+            style="Hint.TLabel",
+        )
+        self.lbl_hint.grid(row=4, column=0, sticky="w", pady=(0, 16))
 
-        # Entry + feedback
+        # ── Bottom entry (pinned) ─────────────────────────────────
         entry_wrap = ttk.Frame(left, style="EntryWrap.TFrame")
-        entry_wrap.grid(row=5, column=0, sticky="ew")
+        entry_wrap.grid(row=6, column=0, sticky="ew")
         entry_wrap.columnconfigure(0, weight=1)
 
         self.var_input = tk.StringVar()
@@ -295,9 +306,9 @@ class PloverPracticeApp(ttk.Frame):
         self.entry.grid(row=0, column=0, sticky="ew", padx=2, pady=2)
 
         self.lbl_feedback = ttk.Label(left, text="Type the word/phrase…", style="Muted.TLabel")
-        self.lbl_feedback.grid(row=6, column=0, sticky="w", pady=(10, 0))
+        self.lbl_feedback.grid(row=7, column=0, sticky="w", pady=(10, 0))
 
-        # Right pane: stats cards
+        # ── Right pane (stats) ────────────────────────────────────
         right = ttk.Frame(main)
         right.grid(row=0, column=1, sticky="nsew")
         right.columnconfigure(0, weight=1)
@@ -595,14 +606,14 @@ class PloverPracticeApp(ttk.Frame):
         self.lbl_feedback.configure(text="✗ Incorrect", foreground=self.COL_BAD)
         self.lbl_word.configure(foreground=self.COL_BAD)
 
-    def _hint_for(self, word: str) -> str:
+    def _hint_for(self, word: str, max_hints=20) -> str:
         clean = word.strip(".,!?;:\"'()[]{}").lower()
         strokes = self.steno_dict.get(clean)
         if strokes:
-            joined = " | ".join(strokes[:4])
-            if len(strokes) > 4:
+            joined = " | ".join(strokes[:max_hints])
+            if len(strokes) > max_hints:
                 joined += " | …"
-            return f"Steno: {joined}"
+            return f"Steno:\n{joined}"
         return "(no steno mapping found)"
 
     def _update_hint(self):
